@@ -1,51 +1,48 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-def calculate_suitability_score(address, driver):
-    vowels = "aeiouAEIOU"
-    consonants = "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ"
+# Function to calculate the suitability score (SS) between a driver and a destination.
+def suitability_score(driver_name, address):
+    vowels = "AEIOUaeiou"
+    consonants = "BCDFGHJKLMNPQRSTVWXYZbcdfghjklmnpqrstvwxyz"
     
-    address_length = len(address)
-    driver_length = len(driver)
+    # Count the vowels and consonants in the driver's name.
+    num_vowels = sum(1 for char in driver_name if char in vowels)
+    num_consonants = sum(1 for char in driver_name if char in consonants)
     
-    num_vowels = sum(1 for char in driver if char in vowels)
-    num_consonants = sum(1 for char in driver if char in consonants)
-    
-    if address_length % 2 == 0:
+    # Calculate the base score depending on the length of the shipment's street name.
+    street_name = address.split(',')[0]  # Extract the street name.
+    if len(street_name) % 2 == 0:
         base_ss = num_vowels * 1.5
     else:
         base_ss = num_consonants
-    
-    for i in range(2, min(address_length, driver_length) + 1):
-        if address_length % i == 0 and driver_length % i == 0:
-            base_ss *= 1.5
-            break
-    
+        
+    # Increase the base score by 50% if the street name and driver's name share common factors.
+    common_factors = [i for i in range(2, min(len(street_name), len(driver_name)) + 1) if len(street_name) % i == 0 and len(driver_name) % i == 0]
+    if common_factors:
+        base_ss *= 1.5
+        
     return base_ss
 
-def optimal_shipment_assignment(addresses, drivers):
-    ss_matrix = [[calculate_suitability_score(address, driver) for driver in drivers] for address in addresses]
-    
-    max_ss = np.max(ss_matrix)
-    cost_matrix = max_ss - np.array(ss_matrix)
+# Read the list of drivers and addresses from the files.
+with open("10-list-drivers (3).txt", "r") as f:
+    drivers = f.read().splitlines()
 
-    row_indices, col_indices = linear_sum_assignment(cost_matrix)
-    
-    optimal_assignments = [(addresses[i], drivers[j], ss_matrix[i][j]) for i, j in zip(row_indices, col_indices)]
-    total_ss = sum(ss_matrix[i][j] for i, j in zip(row_indices, col_indices))
-    
-    return optimal_assignments, total_ss
+with open("10-list-addresses (3).txt", "r") as f:
+    addresses = f.read().splitlines()
 
-if __name__ == "__main__":
-    with open("10-list-drivers (3).txt", "r") as f:
-        drivers = f.read().splitlines()
+# Create a cost matrix (negative since we want to maximize the SS).
+cost_matrix = np.array([[-suitability_score(driver, address) for address in addresses] for driver in drivers])
 
-    with open("10-list-addresses (3).txt", "r") as f:
-        addresses = f.read().splitlines()
+# Use the Hungarian algorithm to find the optimal assignment.
+row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
-    assignments, total_ss = optimal_shipment_assignment(addresses, drivers)
-    
-    print("Optimal Assignments:")
-    for address, driver, ss in assignments:
-        print(f"{address} : {driver} : {ss}")
-    print(f"Total SS: {total_ss}")
+# Display the optimal assignments and the total SS.
+print("Optimal Assignments:")
+total_ss = 0
+for r, c in zip(row_ind, col_ind):
+    ss = -cost_matrix[r][c]
+    total_ss += ss
+    print(f"{addresses[c]} : {drivers[r]} : {ss}")
+
+print(f"Total SS: {total_ss}")
